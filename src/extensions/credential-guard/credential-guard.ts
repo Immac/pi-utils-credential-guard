@@ -148,12 +148,13 @@ export default function (pi: ExtensionAPI) {
       originalRead.description +
       " Credential files (auth.json, .env, .aws, .ssh/, etc.) are blocked by the credential-guard extension.",
 
-    // Add prompt guidelines to steer the model away from reading creds directly.
-    // These are conditionally worded — the before_agent_start handler adds
-    // secret-store specific guidance when that extension is available.
+    // Prompt guidelines are kept generic here — they're always present in the
+    // system prompt regardless of whether secret-store is installed.
+    // Tool-specific guidance (secret-store tools, ask instructions) is injected
+    // conditionally via before_agent_start below.
     promptGuidelines: [
-      "The read tool blocks access to credential files. Use get_secret, with_secret, and import_secret to manage credentials instead.",
-      "Do not attempt to read credential files with bash either — use the secret management tools.",
+      "The read tool blocks access to credential files (auth.json, .env, .aws/credentials, .ssh/, etc.).",
+      "Do not attempt to read credential files with bash or other tools either.",
     ],
 
     // Override execute to add path checking
@@ -165,7 +166,7 @@ export default function (pi: ExtensionAPI) {
       if (check.blocked) {
         const guidance = hasSecretStore
           ? `Use import_secret to import credentials from this file, then use get_secret / with_secret to access them.`
-          : `Use ask_secret to store individual values. For full credential management (import_secret, with_secret, etc.), install the secret-store extension.`;
+          : `This credential file is blocked to prevent leakage. Install the secret-store extension for secure credential management (import, retrieval, env-var injection).`;
 
         return {
           content: [
@@ -198,9 +199,9 @@ export default function (pi: ExtensionAPI) {
     if (!hasSecretStore) {
       parts.push(
         "• Credential files (auth.json, .env, .aws/, .ssh/, etc.) are blocked from reading. " +
-        "Use ask_secret to prompt the user for individual credentials and store them securely. " +
-        "Consider installing the secret-store extension for import_secret (bulk import from files) " +
-        "and with_secret (run commands with secrets injected as env vars)."
+        "Install the secret-store extension to enable secure credential management tools: " +
+        "import_secret (bulk import from files), get_secret/with_secret (retrieval + env-var injection), " +
+        "and ask_secret (prompt user for individual values)."
       );
     }
 

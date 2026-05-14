@@ -25,7 +25,7 @@ Credential Guard overrides the single `read` tool. When a blocked path is detect
 | Scenario | Block message says |
 |---|---|
 | secret-store installed | *"Use `import_secret` to import credentials, then `get_secret` / `with_secret` to access them."* |
-| secret-store not installed | *"Use `ask_secret` to store individual values. Install secret-store for full credential management."* |
+| secret-store not installed | *"Blocked. Install the secret-store extension for secure credential management."* |
 
 Allowed reads pass through to the original `read` implementation unchanged — all rendering, truncation, offset/limit, and image handling are preserved.
 
