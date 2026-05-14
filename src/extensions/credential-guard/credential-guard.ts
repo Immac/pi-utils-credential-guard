@@ -76,8 +76,6 @@ function resolveHome(path: string): string {
 
 /** Check if a file path should be blocked */
 function isBlocked(absolutePath: string): { blocked: boolean; reason?: string } {
-  const home = process.env.HOME || "~";
-
   // Check exact paths (resolve ~)
   for (const pattern of EXACT_BLOCKED_PATHS) {
     const resolved = resolveHome(`~/${pattern}`);
@@ -125,9 +123,8 @@ export default function (pi: ExtensionAPI) {
       toolNames.includes("with_secret");
   }
 
-  // Initial detection at load time. We also re-check before each agent turn
-  // since tools may be registered dynamically after startup.
-  detectSecretStore();
+  // Re-check on session start (all extensions are loaded by then)
+  // and before each agent turn (tools may be registered dynamically).
   pi.on("session_start", async () => {
     detectSecretStore();
   });
