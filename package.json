@@ -1,0 +1,28 @@
+{
+  "name": "credential-guard",
+  "version": "1.0.0",
+  "description": "Blocks reading of credential files and guides the model toward secure secret management tools",
+  "type": "module",
+  "keywords": ["pi-package", "pi-extension", "secrets", "security", "credentials"],
+  "license": "MIT",
+  "scripts": {
+    "validate": "tsc --noEmit --skipLibCheck"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "@earendil-works/pi-ai": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.74.0",
+    "@earendil-works/pi-tui": "^0.74.0",
+    "@earendil-works/pi-ai": "^0.74.0",
+    "typebox": "^1.1.38",
+    "typescript": "^5.0.0",
+    "@types/node": "^22.0.0"
+  },
+  "pi": {
+    "extensions": ["./src/extensions/credential-guard/credential-guard.ts"]
+  }
+}
