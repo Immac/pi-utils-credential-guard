@@ -58,17 +58,24 @@ These fallbacks are **automatically omitted** when the full `secret-store` exten
 
 ## 🚀 Quick Start
 
+### Minimal (credential guard + in-memory fallback)
+
 ```bash
 pi install /path/to/credential-guard
 # or: cp -r credential-guard ~/.pi/agent/extensions/credential-guard && /reload
 ```
 
-Then install the companion for full credential management:
+`ask_secret`, `get_secret`, and `with_secret` are available immediately — values stay in memory for the session only.
+
+### Recommended (with persistent secret store)
 
 ```bash
+pi install /path/to/credential-guard
 pi install /path/to/secret-store
 /reload
 ```
+
+`get_secret` / `with_secret` now persist to disk. `import_secret` and custom templates become available.
 
 ---
 
@@ -106,14 +113,26 @@ Credential Guard provides in-memory fallbacks on its own. For **persistent stora
 
 ### How they work together
 
+**With secret-store installed (recommended):**
+
 ```
 read(path="~/.aws/credentials")
   └─ credential-guard blocks
        └─ "Use import_secret to import this file"
             └─ import_secret(path="~/.aws/credentials")
-                 └─ Parsed as INI → stored as aws:default:aws_access_key_id
-                      └─ Source file optionally deleted
-                           └─ Values available via get_secret / with_secret
+                 └─ Parsed → stored persistently → source optionally deleted
+                      └─ get_secret / with_secret (survives restarts)
+```
+
+**Without secret-store (fallback mode):**
+
+```
+read(path="~/.aws/credentials")
+  └─ credential-guard blocks
+       └─ "Use ask_secret to enter values manually"
+            └─ ask_secret(key="aws_key", prompt="Enter AWS key")
+                 └─ Stored in memory (session only)
+                      └─ get_secret / with_secret (lost on restart)
 ```
 
 ---
