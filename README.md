@@ -18,16 +18,28 @@
 
 ---
 
-## 📦 What It Does
+## 📦 What It Provides
 
-Credential Guard overrides the single `read` tool. When a blocked path is detected, it returns a guidance message instead of file contents:
+### Read guard (always active)
 
-| Scenario | Block message says |
+Overrides the built-in `read` tool to block credential file access. Allowed reads pass through unchanged — all rendering, truncation, offset/limit, and image handling are preserved.
+
+| Scenario | Blocked file guidance |
 |---|---|
 | secret-store installed | *"Use `import_secret` to import credentials, then `get_secret` / `with_secret` to access them."* |
-| secret-store not installed | *"Blocked. Install the secret-store extension for secure credential management."* |
+| secret-store not installed | *"Use `ask_secret` to enter values manually, then `get_secret`/`with_secret` to use them (session-only, in-memory)."* |
 
-Allowed reads pass through to the original `read` implementation unchanged — all rendering, truncation, offset/limit, and image handling are preserved.
+### Fallback secret tools (when secret-store absent)
+
+If the companion `secret-store` extension is not installed, Credential Guard registers lightweight **in-memory** versions of the core secret tools. Values are session-scoped and never persisted to disk:
+
+| Tool | Description | Storage |
+|---|---|---|
+| `ask_secret` | Prompt the user for a credential via TUI dialog | In-memory `Map` (session only) |
+| `get_secret` | Retrieve metadata (key, length) — value cached in memory | In-memory `Map` |
+| `with_secret` | Run a command with secret injected as env var | In-memory `Map` |
+
+These fallbacks are **automatically omitted** when the full `secret-store` extension is detected — its persistent versions take precedence.
 
 ### Blocked paths
 
@@ -83,14 +95,14 @@ read(path="src/index.ts")
 
 ## 🔌 Companion Extension: Secret Store
 
-For the best experience, pair Credential Guard with the [Secret Store](https://github.com/Immac/pi-utils-secret-store) extension:
+Credential Guard provides in-memory fallbacks on its own. For **persistent storage** and **bulk file import**, pair it with the [Secret Store](https://github.com/Immac/pi-utils-secret-store) extension:
 
-| Tool | Purpose |
-|---|---|
-| `ask_secret` | Prompt user for a credential, store securely |
-| `get_secret` | Retrieve metadata without leaking values |
-| `with_secret` | Run commands with secret injected as env var |
-| `import_secret` | Bulk import from `.env`, JSON, INI, or custom template |
+| Tool | Purpose | Upgrade from fallback… |
+|---|---|---|
+| `ask_secret` | Prompt user for a credential, **persist to disk** | In-memory only → persisted to `auth.json` |
+| `get_secret` / `with_secret` | Retrieve + use credentials | Same API, but values survive restarts |
+| `import_secret` | Bulk import from `.env`, JSON, INI, or custom template | Not available in fallback |
+| `import_secret_template_add/list/remove` | Custom regex templates for non-standard formats | Not available in fallback |
 
 ### How they work together
 
