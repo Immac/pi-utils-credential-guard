@@ -1,64 +1,138 @@
 # 🔒 Credential Guard
 
-**Blocks reading of credential files and guides the model toward secure secret management tools.**
+**Blocks reading of credential files and guides the model toward secure secret management tools.** Overrides the built-in `read` tool to prevent accidental credential leakage into session history.
+
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)
+![MIT License](https://img.shields.io/badge/license-MIT-green?style=flat-square)
+![Pi Extension](https://img.shields.io/badge/pi--extension-orange?style=flat-square)
 
 ---
 
-## How It Works
+## ✨ Features
 
-Overrides the built-in `read` tool to block access to known credential file paths:
+- 🚫 **Blocks credential reads** — prevents `read` tool from accessing auth.json, .env, .aws, .ssh, etc.
+- 🧠 **Secret-store aware** — detects companion `secret-store` extension via `pi.getAllTools()`
+- 📋 **Conditional guidance** — block message differs based on whether secret-store is installed
+- 📝 **System prompt injection** — adds `Credential Management` section when secret-store is absent
+- 🔌 **Non-invasive** — spreads original tool definition, delegates allowed reads to the original `createReadTool`
 
-| Pattern | Examples blocked |
-|---------|-----------------|
-| `auth.json` | `~/.pi/agent/auth.json` |
+---
+
+## 📦 What It Does
+
+Credential Guard overrides the single `read` tool. When a blocked path is detected, it returns a guidance message instead of file contents:
+
+| Scenario | Block message says |
+|---|---|
+| secret-store installed | *"Use `import_secret` to import credentials, then `get_secret` / `with_secret` to access them."* |
+| secret-store not installed | *"Use `ask_secret` to store individual values. Install secret-store for full credential management."* |
+
+Allowed reads pass through to the original `read` implementation unchanged — all rendering, truncation, offset/limit, and image handling are preserved.
+
+### Blocked paths
+
+| Pattern | Examples |
+|---|---|
+| `auth.json` | `~/.pi/agent/auth.json`, `~/.local/share/opencode/auth.json` |
 | `.env`, `.env.*` | `.env`, `.env.local`, `.env.production` |
 | `credentials*` | `.aws/credentials`, `credentials.json` |
-| `secret*`, `*.key`, `*.pem` | `secrets.json`, `id_rsa`, `cert.pem` |
-| `.ssh/`, `.aws/`, `.gnupg/` | SSH keys, AWS creds, GPG keys |
+| `secret*`, `secrets*` | `secrets.json`, `secret.yaml` |
+| `*.key`, `*.pem`, `*.p12`, `*.pfx` | `id_rsa`, `cert.pem`, `keystore.p12` |
+| `.ssh/` | SSH private keys |
+| `.aws/` | AWS access keys |
+| `.gnupg/` | GPG keys |
 
-When a read is blocked, the extension checks whether the **secret-store** companion extension is installed:
+---
 
-| secret-store installed? | Block message says |
-|------------------------|-------------------|
-| ✅ Yes | *"Use `import_secret` to import credentials, then `get_secret` / `with_secret` to access them."* |
-| ❌ No | *"Use `ask_secret` to store individual values. Install secret-store for full credential management."* |
-
-## Installation
+## 🚀 Quick Start
 
 ```bash
 pi install /path/to/credential-guard
+# or: cp -r credential-guard ~/.pi/agent/extensions/credential-guard && /reload
 ```
 
-Or copy to auto-discovery:
+Then install the companion for full credential management:
+
 ```bash
-cp -r credential-guard ~/.pi/agent/extensions/credential-guard
+pi install /path/to/secret-store
+/reload
 ```
 
-Then `/reload`.
+---
 
-## Companion Extension
+## 💡 Usage Examples
 
-For the best experience, install the **secret-store** extension alongside credential-guard:
+No explicit invocation needed — the guard works automatically whenever `read` is called:
 
-- `ask_secret` — prompt user for a credential, store securely
-- `get_secret` — retrieve metadata without leaking values
-- `with_secret` — run commands with secret injected as env var
-- `import_secret` — bulk import from `.env`, JSON, INI, or custom template
+```
+# Without credential-guard:
+read(path="~/.aws/credentials")
+  → File contents returned → credentials leaked into session
 
-## System Prompt Injection
+# With credential-guard:
+read(path="~/.aws/credentials")
+  → "Access denied: matches credential store path"
+  → "Use import_secret to import credentials, then get_secret/with_secret"
 
-When secret-store is NOT detected, the extension injects a `Credential Management` section into the system prompt via `before_agent_start`, guiding the model toward `ask_secret` and suggesting installation of the secret-store extension.
+# Non-credential files are unaffected:
+read(path="src/index.ts")
+  → Normal read (syntax highlighting, line numbers, truncation)
+```
 
-## Design
+---
+
+## 🔌 Companion Extension: Secret Store
+
+For the best experience, pair Credential Guard with the [Secret Store](https://github.com/Immac/pi-utils-secret-store) extension:
+
+| Tool | Purpose |
+|---|---|
+| `ask_secret` | Prompt user for a credential, store securely |
+| `get_secret` | Retrieve metadata without leaking values |
+| `with_secret` | Run commands with secret injected as env var |
+| `import_secret` | Bulk import from `.env`, JSON, INI, or custom template |
+
+### How they work together
 
 ```
 read(path="~/.aws/credentials")
-  → credential-guard intercepts
-    → is it a blocked path? YES
-      → has secret-store? → guide toward import_secret/get_secret/with_secret
-      → no secret-store?  → guide toward ask_secret and suggest install
+  └─ credential-guard blocks
+       └─ "Use import_secret to import this file"
+            └─ import_secret(path="~/.aws/credentials")
+                 └─ Parsed as INI → stored as aws:default:aws_access_key_id
+                      └─ Source file optionally deleted
+                           └─ Values available via get_secret / with_secret
 ```
 
-## License
+---
+
+## 🛠️ Development
+
+```bash
+npm run validate   # tsc --noEmit --skipLibCheck
+```
+
+### Project Structure
+
+```
+credential-guard/
+├── package.json
+├── tsconfig.json
+├── src/extensions/credential-guard/
+│   └── credential-guard.ts    # Extension entry: read override + system prompt injection
+└── README.md
+```
+
+---
+
+## 📖 Resources
+
+- [Pi Extension Docs — Tool Overrides](https://github.com/earendil-works/pi-coding-agent/blob/main/docs/extensions.md#overriding-built-in-tools)
+- [Secret Store](https://github.com/Immac/pi-utils-secret-store) — companion extension for credential management
+- [tool-override.ts example](https://github.com/earendil-works/pi-coding-agent/blob/main/examples/extensions/tool-override.ts)
+
+---
+
+## 📄 License
 
 MIT
