@@ -186,11 +186,11 @@ export default function (pi: ExtensionAPI) {
           content: [
             {
               type: "text" as const,
-              text: `Secret "${key}" stored in memory (${value.length} chars, session-only). ` +
+              text: `Secret "${key}" stored in memory (session-only). ` +
                 `Use with_secret(key="${key}", command="...") to use it.`,
             },
           ],
-          details: { stored: true, key, valueLength: value.length, persisted: false },
+          details: { stored: true, key, persisted: false },
         };
       },
     });
@@ -223,18 +223,16 @@ export default function (pi: ExtensionAPI) {
           };
         }
 
-        const value = fallbackSecrets.get(key)!;
-
         return {
           content: [
             {
               type: "text" as const,
               text:
-                `Secret "${key}" (${value.length} chars, session-only) retrieved. ` +
+                `Secret "${key}" (session-only) retrieved. ` +
                 `Use with_secret(key="${key}", command="...") to use it.`,
             },
           ],
-          details: { found: true, key, valueLength: value.length, persisted: false },
+          details: { found: true, key, persisted: false },
         };
       },
       renderCall(args, theme, _context) {
@@ -288,7 +286,7 @@ export default function (pi: ExtensionAPI) {
           Type.String({ description: "Environment variable name to inject the secret into (default: SECRET)." })
         ),
         timeout: Type.Optional(
-          Type.Number({ description: "Timeout in milliseconds (default: 60000)." })
+          Type.Number({ description: "Timeout in seconds (default: 60)." })
         ),
       }),
       async execute(_toolCallId, params, signal, _onUpdate, ctx) {
@@ -310,7 +308,7 @@ export default function (pi: ExtensionAPI) {
           const { stdout, stderr } = await execAsync(command, {
             cwd: ctx.cwd,
             env: { ...process.env, [varName]: secret },
-            timeout: timeout ?? 60_000,
+            timeout: (timeout ?? 60) * 1000,
             maxBuffer: 50 * 1024,
             signal,
           });
@@ -319,10 +317,14 @@ export default function (pi: ExtensionAPI) {
             content: [{ type: "text" as const, text: stdout || "(no output)" }],
             details: { executed: true, key, envVar: varName, exitCode: 0, stderr },
           };
-        } catch (e: any) {
+        } catch (e: unknown) {
+          const execErr = e && typeof e === "object" ? (e as Record<string, unknown>) : {};
+          const stderr = typeof execErr.stderr === "string" ? execErr.stderr : "";
+          const message = execErr.message ? String(execErr.message) : String(e);
+          const code = typeof execErr.code === "number" ? execErr.code : 1;
           return {
-            content: [{ type: "text" as const, text: e.stderr || e.message }],
-            details: { executed: true, key, envVar: varName, exitCode: e.code ?? 1, stderr: e.stderr },
+            content: [{ type: "text" as const, text: stderr || message }],
+            details: { executed: true, key, envVar: varName, exitCode: code, stderr },
           };
         }
       },
